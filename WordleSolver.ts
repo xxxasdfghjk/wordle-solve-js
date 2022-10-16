@@ -3,7 +3,6 @@ import { exit } from "process"
 const fs = require('fs')
 const reader = require('readline')
 
-const ANSWER_WORD = "buxom"
 type CharStatus = 'NON_EXIST' | 'EXIST' | 'CONFIRM'
 const allWordListPath = "./resource/wordlist_all"
 const hiddenWordListPath = "./resource/wordlist_hidden"
@@ -38,8 +37,8 @@ const convertCurrentStatusArray = (charStatusArray: CharStatus[]): string => {
     }).join()
 }
 
-const excluedeWord = (wordList: string[], result: Array<[string, CharStatus, number]>, answerWord: string) => {
-    var resultList = wordList
+const excluedeWord = (wordList: string[], result: Array<[string, CharStatus, number]>) => {
+    let resultList = wordList
     for (const [char, status, index] of result) {
         switch (status) {
             case 'CONFIRM':
@@ -47,6 +46,7 @@ const excluedeWord = (wordList: string[], result: Array<[string, CharStatus, num
                 break
             case 'EXIST':
                 resultList = resultList.filter((word) => word.includes(char))
+                resultList = resultList.filter((word) => word[index] != char)
                 break
             case 'NON_EXIST':
                 resultList = resultList.filter((word) => !word.includes(char))
@@ -55,45 +55,89 @@ const excluedeWord = (wordList: string[], result: Array<[string, CharStatus, num
     }
     return resultList
 }
-const calcEntropy = (prohability: {}) => {
-    const length = Object.keys(prohability).length
+const calcEntropy = (prohability: { [k: string]: number }) => {
+    let length = 0
+    for (const value of Object.values(prohability)) {
+        length += value
+    }
     let sum = 0
     for (const value of Object.values(prohability)) {
-        if (typeof value === 'number')
-            sum += - (value / length) * Math.log2(value / length)
+        sum += - (value / length) * Math.log2(value / length)
     }
     return sum
 }
-const selectWord = (restWordList: string[], answerableWordList: string[], isFirst?: boolean): string => {
+const getInfoProfit = (answerableWord: string, submittedWords: Array<[string, CharStatus, number]>): number => {
+    let res = 0
+    answerableWord.split("").forEach((value, index) => {
+        if (submittedWords.filter((elem) => elem[0] == value && elem[1] == 'CONFIRM' && elem[2] == index).length >= 1) {
+            res = res - 1.0;
+        }
+        if (submittedWords.filter((elem) => elem[0] == value && elem[1] == 'NON_EXIST').length >= 1) {
+            res = res - 1.0;
+        }
+        if (submittedWords.filter((elem) => elem[0] == value).length == 0) {
+            res = res + 0.5;
+        }
+    })
+    return res
+}
+
+const selectWord = (restWordList: string[], answerableWordList: string[], submittedResult: Array<[string, CharStatus, number]>, isFirst?: boolean,): string => {
     if (isFirst)
         return "soare"
     if (restWordList.length <= 2) return restWordList[0];
-    const list = answerableWordList.map((word) => {
-        return {
-            "entropy": calcEntropy(
-                restWordList.map((restWord) => diffWord(word, restWord))
-                    .map(convertCurrentStatusArray)
-                    .reduce((previousValue: { [k: string]: number }, currentValue: string) => {
-                        previousValue[currentValue] = (previousValue[currentValue] || 0) + 1
-                        return previousValue
-                    }, {}))
-            , word
+    const wordRank: Array<{ "entropy": number, answerableWord: string, infoProfit: number }> = []
+    for (const answerableWord of answerableWordList) {
+        const stateObj: { [k: string]: number } = {}
+        for (const restWord of restWordList) {
+            const statusString: string = convertCurrentStatusArray(diffWord(answerableWord, restWord))
+            stateObj[statusString] = (stateObj[statusString] || 0) + 1
         }
-    }).sort((p1, p2) => p2.entropy - p1.entropy)
-    return list[0].word
+        const infoProfit = getInfoProfit(answerableWord, submittedResult)
+        wordRank.push({ "entropy": calcEntropy(stateObj), answerableWord, infoProfit })
+    }
+    wordRank.sort((p1, p2) =>
+        p2.entropy - p1.entropy
+    )
+    return wordRank[0].answerableWord
 }
+
+
 const isEnd = (charStatusArray: Array<[string, CharStatus, number]>) => {
     return charStatusArray.every((status) => status[1] == 'CONFIRM')
 }
-const solve = (restWordList: string[], answerWord: string, submittedWord?: string) => {
-    const submitString = selectWord(restWordList, allWordList)
-    const result = submitWord(submitString, answerWord)
-    if (isEnd(result)) {
-        console.log(`answer = ${submitString}`)
-        return
+const solve = (restWordList: string[], answerWord: string, selectableWords: string[]): Array<string> => {
+    let tryNum = 0;
+    const tryWords: Array<string> = []
+    const submittedResult: Array<[string, CharStatus, number]> = []
+    while (true) {
+        const submitString = selectWord(restWordList, selectableWords, submittedResult, tryNum == 0)
+        tryWords.push(submitString)
+        tryNum++;
+        const result = submitWord(submitString, answerWord)
+        submittedResult.push(...result)
+        if (isEnd(result) || tryNum >= 11) {
+            return tryWords
+        }
+        // selectableWords = excluedeWord(restWordList.filter((elem) => elem != submitString), result)
+        selectableWords = selectableWords.filter((elem) => elem != submitString)
+        restWordList = excluedeWord(restWordList.filter((elem) => elem != submitString), result)
     }
-    console.log(submitString)
-    solve(excluedeWord(restWordList, result, answerWord), answerWord, submitString)
+
+
 }
 
-solve(hiddenWordList, ANSWER_WORD)
+const allTest = () => {
+    let sum = 0
+    for (const word of hiddenWordList) {
+        const tryWords = solve(hiddenWordList, word, allWordList)
+        sum += tryWords.length
+        console.log(tryWords.join(","))
+    }
+}
+
+const singleTest = (word: string) => {
+    const tryWords = solve(hiddenWordList, word, allWordList)
+    console.log(tryWords)
+}
+allTest()
