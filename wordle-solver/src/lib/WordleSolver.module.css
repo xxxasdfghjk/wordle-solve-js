@@ -1,0 +1,56 @@
+body {
+    background-color: rgb(44, 43, 45);
+}
+
+.container {
+    width: 500px;
+    height: 600px;
+    margin: 0 auto;
+}
+
+.char-non-exist {
+    background-color: #3a3a3c
+}
+
+.char-exist {
+    background-color: #b59f3b;
+}
+
+.char-no-info {
+    background-color: #121213;
+}
+
+.char-confirm {
+    background-color: #538d4e;
+}
+
+
+.inner-block {
+    font-size: 40px;
+    align-items: center;
+    font-weight: bold;
+    justify-content: center;
+    color: white;
+    display: flex;
+    width: 80px;
+    height: 80px;
+}
+
+.box {
+    font-size: 40px;
+    width: 100px;
+    height: 100px;
+    align-items: center;
+    font-weight: bold;
+    justify-content: center;
+    color: white;
+    display: flex;
+    outline: 2px solid gray;
+    outline-offset: -10px;
+}
+
+.display {
+    display: flex;
+    flex-direction: row;
+    vertical-align: middle;
+}
