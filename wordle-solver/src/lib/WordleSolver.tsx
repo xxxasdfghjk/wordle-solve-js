@@ -70,6 +70,7 @@ const calcEntropy = (probability: { [k: string]: number }) => {
 const selectWord = (restWordList: string[], answerableWordList: string[], isFirst?: boolean): string => {
     if (isFirst)
         return "soare"
+
     if (restWordList.length <= 2) return restWordList[0];
     const wordRank: Array<{ "entropy": number, answerableWord: string }> = []
     for (const answerableWord of answerableWordList) {
@@ -98,10 +99,10 @@ const nextWord = (restWordList: string[], selectableWords: string[], tryNum: num
     const newRestWordList = excludeWord(restWordList, result)
     if (newRestWordList.length == 0) {
         return { isEnd: true, nextString: '     ', isInvalid: true, restWordList: newRestWordList }
-    } else if (restWordList.length == 1) {
-        return { isEnd: true, nextString: restWordList[0], isInvalid: false, restWordList: newRestWordList }
+    } else if (newRestWordList.length == 1) {
+        return { isEnd: true, nextString: newRestWordList[0], isInvalid: false, restWordList: newRestWordList }
     } else {
-        return { isEnd: false, nextString: selectWord(restWordList, selectableWords, tryNum == 0), isInvalid: true, restWordList: newRestWordList }
+        return { isEnd: false, nextString: selectWord(newRestWordList, selectableWords, false), isInvalid: false, restWordList: newRestWordList }
     }
 }
 
@@ -121,20 +122,11 @@ const solve = (restWordList: string[], answerWord: string, selectableWords: stri
     }
 }
 
-// const allTest = () => {
-//     let sum = 0
-//     for (const word of hiddenWordList) {
-//         const tryWords = solve(hiddenWordList, word, allWordList)
-//         sum += tryWords.length
-//         console.log(tryWords.join(","))
-//     }
-// }
-
-// const singleTest = (word: string) => {
-//     const tryWords = solve(hiddenWordList, word, allWordList)
-//     console.log(tryWords)
-// }
-
+const singleTest = async (word: string) => {
+    const allWordList = (await (await fetch(allWordsURL)).text()).split('\n')
+    const hiddenWordList = (await (await fetch(hiddenWordsURL)).text()).split('\n')
+    const tryWords = solve(hiddenWordList, word, allWordList)
+}
 
 const charStyleName = (status: CharStatus) => {
     switch (status) {
@@ -178,14 +170,25 @@ const WordDisplay = (props: { words: string, children: ReactNode, charStates: Ar
     </div>)
 }
 
-const SubmitButton = (props: { onClick: () => void, isValid: boolean }) => {
-    return <button onClick={props.onClick}></button>
+const message = "No answer exists."
+const Balloon = (props: { message: string }) => {
+    return (<div className={style.balloon}>{props.message}</div>)
+}
+
+const SubmitButton = (props: { onClick: () => void, isValid: boolean, showNoticeBalloon: boolean, buttonMessage: string }) => {
+    return (<div className={style.buttonWrapper}>
+        <button className={classNames(props.isValid && style.canSubmit)} onClick={props.onClick}>{props.buttonMessage}</button>
+        {props.showNoticeBalloon &&
+            <Balloon message={message} />}
+    </div>)
 }
 
 const makeWordleResult = (str: string, states: Array<CharStatus>): wordleResult => {
     return states.map((status: CharStatus, index: number) => { return { index, status, char: str[index] } })
 }
 
+const allWordsURL = "https://raw.githubusercontent.com/techtribeyt/Wordle/main/wordle_guesses.txt"
+const hiddenWordsURL = "https://raw.githubusercontent.com/techtribeyt/Wordle/main/wordle_answers.txt"
 
 const wordLength = 5
 const displaySize = 6
@@ -193,19 +196,22 @@ const firstWord = "soare";
 const WordleSolver = (props: {}) => {
     const [stringState, setStringState] = useState<Array<Array<CharStatus>>>([]);
     const [allWordsList, setSelectableAllWordsList] = useState<string[]>([])
-    const [hiddenWordsList, setHiddenAllWordsList] = useState<string[]>([])
+    const [hiddenWordsList, setHiddenAllWordsList] = useState<Array<string[]>>([])
     const [canEditState, setCanEditState] = useState<Array<boolean>>([]);
-    const [submittedNum, setSubmittedNum] = useState(0)
+    const [submittedNum, setSubmittedNum] = useState(1)
     const [submittedString, setSubmittedString] = useState<Array<string>>([])
+    const [noticeBalloonState, setNoticeBalloonState] = useState<Array<boolean>>([])
+
     useEffect(() => {
         const setTextData = async () => {
-            const allWordList = await (await fetch("https://raw.githubusercontent.com/techtribeyt/Wordle/main/wordle_answers.txt")).text()
-            const hiddenWordList = await (await fetch("https://raw.githubusercontent.com/techtribeyt/Wordle/main/wordmaster_guesses.txt")).text()
+            const allWordList = await (await fetch(allWordsURL)).text()
+            const hiddenWordList = await (await fetch(hiddenWordsURL)).text()
             setSelectableAllWordsList(allWordList.split("\n"))
-            setHiddenAllWordsList(hiddenWordList.split("\n"))
+            setHiddenAllWordsList([hiddenWordList.split("\n")])
             setCanEditState(' '.repeat(displaySize).split("").map((_, index) => index == 0 ? true : false))
-            setStringState(' '.repeat(displaySize).split("").map(() => ' '.repeat(wordLength).split("").map(() => 'NON_EXIST')))
+            setStringState(' '.repeat(1).split("").map(() => ' '.repeat(wordLength).split("").map(() => 'NON_EXIST')))
             setSubmittedString(['soare'])
+            setNoticeBalloonState(' '.repeat(displaySize).split("").map((_, index) => false))
         }
         setTextData()
     }, [])
@@ -224,25 +230,30 @@ const WordleSolver = (props: {}) => {
     const buttonClick = (index: number) => {
         return () => {
             if (canEditState[index]) {
-                const { isEnd, nextString, isInvalid, restWordList } = nextWord(hiddenWordsList, allWordsList, submittedNum + 1, makeWordleResult(submittedString[index], stringState[index]))
-                console.log(nextString, isEnd);
-                console.log(makeWordleResult(submittedString[index], stringState[index]))
-                if (isEnd) {
-                    const allGreen: CharStatus[] = ' '.repeat(wordLength).split("").map(() => 'CONFIRM')
-                    const newStringState = stringState;
-                    newStringState[index + 1] = allGreen;
-                    setStringState([...newStringState])
-                    const newCanEditState = ' '.repeat(wordLength).split("").map(() => false)
-                    setCanEditState(newCanEditState)
-                    setSubmittedString([...submittedString, nextString])
-                    console.log("finished")
+                if (stringState[index].every((e) => e == 'CONFIRM')) {
+                    setNoticeBalloonState(' '.repeat(displaySize).split("").map((value, i) => false))
 
-                } else {
-                    setHiddenAllWordsList(restWordList)
-                    const newCanEditState = ' '.repeat(wordLength).split("").map((_, i) => i == index + 1 ? true : false)
-                    setCanEditState(newCanEditState)
-                    setSubmittedString([...submittedString, nextString])
+                    return
                 }
+                const { isEnd, nextString, isInvalid, restWordList } = nextWord(hiddenWordsList[index], allWordsList, submittedNum +
+                    1, makeWordleResult(submittedString[index], stringState[index]))
+                if (isInvalid) {
+                    setNoticeBalloonState(' '.repeat(displaySize).split("").map((value, i) => i == index))
+                    setCanEditState(' '.repeat(displaySize).split("").map((_, i) => i <= index ? true : false))
+                    setStringState([...stringState.slice(0, index + 1)])
+
+                } else if (isEnd) {
+                    setStringState([...stringState.slice(0, index + 1), ' '.repeat(wordLength).split("").map(() => 'CONFIRM')])
+                    setCanEditState(' '.repeat(displaySize).split("").map((_, i) => i <= index ? true : false))
+                    setNoticeBalloonState(' '.repeat(displaySize).split("").map((value, i) => false))
+                } else {
+                    setStringState([...stringState.slice(0, index + 1), ' '.repeat(wordLength).split("").map(() => 'NON_EXIST')])
+                    setCanEditState(' '.repeat(displaySize).split("").map((_, i) => i <= index + 1 ? true : false))
+                    setNoticeBalloonState(' '.repeat(displaySize).split("").map((value, i) => false))
+                }
+
+                setHiddenAllWordsList([...hiddenWordsList.slice(0, index + 1), [...restWordList]])
+                setSubmittedString([...submittedString.slice(0, index + 1), nextString])
             }
         }
     }
@@ -253,7 +264,11 @@ const WordleSolver = (props: {}) => {
                 onClickBox={onClickBox(row)}
                 charStates={stringState[row]}
             >
-                <SubmitButton onClick={buttonClick(row)} isValid={canEditState[row]} />
+                <SubmitButton
+                    onClick={buttonClick(row)}
+                    isValid={canEditState[row]}
+                    showNoticeBalloon={noticeBalloonState?.[row]}
+                    buttonMessage={canEditState[row] ? "SUBMIT" : ""} />
             </WordDisplay>)}
     </div>)
 }

@@ -3,9 +3,9 @@ body {
 }
 
 .container {
-    width: 500px;
+    width: 900px;
     height: 600px;
-    margin: 0 auto;
+    margin: 60px auto;
 }
 
 .char-non-exist {
@@ -36,6 +36,28 @@ body {
     height: 80px;
 }
 
+.buttonWrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+button {
+    margin-left: 16px;
+    height: 70%;
+    width: 150px;
+    background-color: rgb(62, 27, 175);
+    border: 0px solid rgb(24, 32, 27);
+    border-radius: 30px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #ebebeb
+}
+
+.canSubmit:hover {
+    background-color: rgb(143, 132, 177);
+}
+
 .box {
     font-size: 40px;
     width: 100px;
@@ -53,4 +75,22 @@ body {
     display: flex;
     flex-direction: row;
     vertical-align: middle;
+    justify-content: center;
+}
+
+.balloon {
+    position: absolute;
+    display: inline;
+    padding: 2px;
+    background-color: gray;
+    left: 1%;
+    cursor: pointer;
+}
+
+.balloon:after {
+    border: 1px solid black;
+    right: -12px;
+    top: 5%;
+    content: "";
+    position: absolute;
 }
